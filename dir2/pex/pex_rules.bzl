@@ -190,6 +190,10 @@ def _pex_binary_impl(ctx):
     arguments = ["setuptools==44.1.0"]
 
     # form the arguments to pex builder
+    for egg in py.transitive_eggs.to_list():
+        arguments += [egg.path]
+    for req in py.transitive_reqs.to_list():
+        arguments += [req]
     if not ctx.attr.zip_safe:
         arguments += ["--not-zip-safe"]
     if not ctx.attr.use_wheels:
@@ -206,10 +210,6 @@ def _pex_binary_impl(ctx):
         arguments += ["--requirement", req_file.path]
     for repo in repos:
         arguments += ["--repo", repo]
-    for egg in py.transitive_eggs.to_list():
-        arguments += [egg.path]
-    for req in py.transitive_reqs.to_list():
-        arguments += [req]
     if main_pkg:
         arguments += ["--entry-point", main_pkg]
     elif script:
@@ -533,6 +533,6 @@ def pex_repositories():
     http_file(
         name = "pex_bin",
         executable = True,
-        urls = ["https://github.com/pantsbuild/pex/releases/download/v2.1.28/pex"],
-        sha256 = "bfc0add2649bd2d76043ef4ec07edf28aa3bf2654e8ee9b8e39ff5dcffb37665",
+        urls = ["https://github.com/pantsbuild/pex/releases/download/v2.1.56/pex"],
+        sha256 = "aff02e2ef0212db4531354e9b7b0d5f61745b3eb49665bc11142f0b603a27db9",
     )
