@@ -163,16 +163,13 @@ def _pex_binary_impl(ctx):
     )
 
     sources_dir = ctx.actions.declare_directory("{}.sources".format(ctx.attr.name))
-
+    pex_tmp_dir_provided = ctx.configuration.default_shell_env.get('PEX_TMP_DIR')
     # Create resource directory and dump files into it
     # Relocate files according to `strip_prefix` if necessary and get all files into the base resource directory
     # Cleanup lingering files to prevent them from being added to the pex
+    # Create tmpdir for pex, if one is provided
     # Add `__init__.py` files to make the modules findable by pex execution
-    ctx.actions.run_shell(
-        mnemonic = "CreateResourceDirectory",
-        outputs = [sources_dir],
-        inputs = runfiles.files.to_list(),
-        command = 'mkdir -p {sources_dir} && rsync -R {transitive_files} {sources_dir} \
+    cmd_to_run = 'mkdir -p {sources_dir} && rsync -R {transitive_files} {sources_dir} \
             && if [ "{strip_prefix}" != "" ] && [ -n "$(ls -A {sources_dir}/{strip_prefix})" ]; then cp -R {sources_dir}/{strip_prefix}/* {sources_dir}; fi \
             && if [ "{strip_prefix}" != "" ]; then rm -rf {sources_dir}/{strip_prefix}; fi \
             && if [ -d {sources_dir}/{genfiles_dir}/{strip_prefix} ] && [ -n "$(ls -A {sources_dir}/{genfiles_dir}/{strip_prefix})" ]; then cp -R {sources_dir}/{genfiles_dir}/{strip_prefix}/* {sources_dir}; fi \
@@ -182,8 +179,14 @@ def _pex_binary_impl(ctx):
             transitive_files = " ".join([file.path for file in runfiles.files.to_list()]),
             genfiles_dir = ctx.configuration.genfiles_dir.path,
             genfiles_parent_dir = ctx.configuration.genfiles_dir.path.split("/")[0],
-            strip_prefix = ctx.attr.strip_prefix.strip("/"),
-        ),
+            strip_prefix = ctx.attr.strip_prefix.strip("/"))
+    if pex_tmp_dir_provided:
+        cmd_to_run += " && mkdir -p {}".format(pex_tmp_dir_provided)
+    ctx.actions.run_shell(
+        mnemonic = "CreateResourceDirectory",
+        outputs = [sources_dir],
+        inputs = runfiles.files.to_list(),
+        command = cmd_to_run,
     )
 
     pexbuilder = ctx.executable._pexbuilder
@@ -194,14 +197,14 @@ def _pex_binary_impl(ctx):
         arguments += [egg.path]
     for req in py.transitive_reqs.to_list():
         arguments += [req]
-    if not ctx.attr.zip_safe:
-        arguments += ["--not-zip-safe"]
     if not ctx.attr.use_wheels:
         arguments += ["--no-use-wheel"]
     if ctx.attr.no_index:
         arguments += ["--no-index"]
     if ctx.attr.disable_cache:
         arguments += ["--disable-cache"]
+    if pex_tmp_dir_provided:
+        arguments += ["--tmpdir", pex_tmp_dir_provided]
     for interpreter in ctx.attr.interpreters:
         arguments += ["--python", interpreter]
     for platform in ctx.attr.platforms:
