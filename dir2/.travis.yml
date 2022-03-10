@@ -1,0 +1,47 @@
+language: java
+
+env:
+  - BAZEL_URL=https://storage.googleapis.com/bazel/0.8.0/release/bazel-0.8.0
+  - BAZEL_URL=https://storage.googleapis.com/bazel/0.7.0/release/bazel-0.7.0
+  - BAZEL_URL=https://storage.googleapis.com/bazel/0.6.1/release/bazel-0.6.1
+  - BAZEL_URL=https://storage.googleapis.com/bazel/0.5.4/release/bazel-0.5.4
+
+os:
+  - linux
+  - osx
+
+# Only affects os=linux
+dist: trusty
+
+# Only affects os=osx
+osx_image: xcode8
+
+# Necessary to test with sandboxing (we don't need root, just need a real VM)
+sudo: required
+
+addons:
+  apt:
+    # Only affects os=linux
+    packages:
+      - pkg-config
+      - zip
+      - g++
+      - zlib1g-dev
+      - unzip
+
+before_script:
+  - case "$TRAVIS_OS_NAME" in
+      linux) BAZEL_OS=linux  ;;
+      osx)   BAZEL_OS=darwin ;;
+      *)     exit 1          ;;
+    esac;
+    wget -O bazel-installer.sh "${BAZEL_URL}-installer-${BAZEL_OS}-x86_64.sh"
+  - chmod +x bazel-installer.sh
+  - ./bazel-installer.sh --user
+
+cache:
+  directories:
+    - $HOME/.bazel/outbase
+
+script:
+  - bazel --batch --output_base="${HOME}/.bazel/outbase" test //... --test_output=errors
